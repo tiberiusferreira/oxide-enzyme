@@ -4,6 +4,11 @@ extern {
     fn __enzyme_autodiff(_: usize, ...);
 }
 
+/// Yep, magic numbers, we look for those number in the output llvm-ir and replace them with metadata
+const ENZYME_CONST: i128 = 1321523312;
+const ENZYME_DUP: i128 = 314210384213;
+
+
 /// Dummy implementation
 fn linear_layer(tensor: &Tensor, weights: &Tensor) -> Tensor{
     multiply(tensor, weights)
@@ -34,6 +39,9 @@ fn softmax(tensor: &Tensor) -> Tensor{
 }
 
 /// Dummy implementation
+/// probdist = [0.3, 0.7]
+/// label = [1, 0]
+/// - (1*log(0.3) + 0*log(0.7))
 fn cross_entropy(input: &Tensor, target: &Tensor) -> f64{
     let mut out = 0.;
     for i in 0..input.data.len(){
@@ -41,11 +49,6 @@ fn cross_entropy(input: &Tensor, target: &Tensor) -> f64{
     }
     out
 }
-// logits=[a , b]
-// probdist = [0.3, 0.7]
-// label = [1, 0]
-
-// - (1*log(0.3) + 0*log(0.7))
 
 
 /// Dummy implementation
@@ -117,13 +120,12 @@ fn multiply(left: &Tensor, right: &Tensor) -> Tensor
     }
 }
 
+
 fn main() {
     let mut input = vec![1., 2., 3., 4.];
-    let mut input_shadow = vec![0.; 4];
     let mut weights = vec![1.; 4];
     let mut weights_shadow = vec![0.; 4];
     let mut target = vec![0., 0., 1., 0.];
-    let mut target_shadow = vec![0., 0., 0., 0.];
 
     for _i in 0..70{
         let res = dummy_nn(input.as_mut_ptr(),
@@ -132,12 +134,16 @@ fn main() {
                            weights.len() as i64,
                            target.as_mut_ptr(),
                            target.len() as i64);
-        println!("{:?}", res);
+        println!("Loss: {:?}", res);
         unsafe {
             __enzyme_autodiff(dummy_nn as usize,
-                              input.as_mut_ptr(), input_shadow.as_mut_ptr(), input.len() as i64,
-                              weights.as_mut_ptr(), weights_shadow.as_mut_ptr(), weights.len() as i64,
-                              target.as_mut_ptr(), target_shadow.as_mut_ptr(), target.len() as i64);
+                              ENZYME_CONST,
+                              input.as_mut_ptr(),
+                              ENZYME_CONST, input.len() as i64,
+                              ENZYME_DUP, weights.as_mut_ptr(), weights_shadow.as_mut_ptr(),
+                              ENZYME_CONST, weights.len() as i64,
+                              ENZYME_CONST, target.as_mut_ptr(),
+                              ENZYME_CONST, target.len() as i64);
         }
         weights.iter_mut().zip(weights_shadow.iter()).for_each(|(weight, grad)|{
             *weight = *weight - *grad*0.01;
