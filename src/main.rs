@@ -22,14 +22,15 @@ fn softmax(tensor: &Tensor) -> Tensor{
     let sum_exp_all: f64 = tensor.data.iter().fold(0., |acc, d|{
         acc + d.exp()
     });
+    /*
     let mut out: Vec<f64> = vec![0.; tensor.data.len()];
     for i in 0..tensor.data.len(){
         out[i] = tensor.data[i].exp()/sum_exp_all;
     }
-    // TODO -> crashes
-    // let exp_all: Vec<f64> = tensor.data.iter().map(|d|{
-    //     d.exp()/sum_exp_all
-    // }).collect();
+    */
+    let out: Vec<f64> = tensor.data.iter().map(|d|{
+        d.exp()/sum_exp_all
+    }).collect();
     Tensor{
         data: out,
         shape: tensor.shape.clone()
@@ -49,32 +50,27 @@ fn cross_entropy(input: &Tensor, target: &Tensor) -> f64{
 }
 
 
+
 /// Dummy implementation
 fn dummy_nn_with_loss(input: *mut f64, input_len: usize, linear_weights: *mut f64, linear_weights_len: usize,
-                      target: *mut f64, target_len: usize, net_output: *mut f64, net_output_len: usize) -> f64{
+                      target: *mut f64, target_len: usize) -> f64{
     let out = dummy_nn(input, input_len, linear_weights, linear_weights_len);
+
     let target_as_slice = unsafe{
         std::slice::from_raw_parts_mut(target, target_len as usize)
     };
-    let net_output_as_slice = unsafe{
-        std::slice::from_raw_parts_mut(net_output, net_output_len as usize)
-    };
-    for i in 0..target_as_slice.len(){
-        net_output_as_slice[i] = out.data[i];
-    }
-    // TODO
-    // input_as_slice.to_vec() crashes!
-    let mut target_vec = vec![0.; target_as_slice.len()];
-    for i in 0..target_as_slice.len(){
-        target_vec[i] = target_as_slice[i];
-    }
+    let target_vec = target_as_slice.to_vec();// crashes!
+    //let mut target_vec = vec![0.; target_as_slice.len()];
+    //for i in 0..target_as_slice.len(){
+    //    target_vec[i] = target_as_slice[i];
+    //}
     let target_tensor = Tensor{
         data: target_vec,
         shape: [2, 2]
     };
-
-    // println!("{:?}", soft_out); // todo this crashes!
+    println!("{:?}", out);
     cross_entropy(&out, &target_tensor)
+    //return 1.0;
 }
 
 
@@ -87,16 +83,8 @@ fn dummy_nn(input: *mut f64, input_len: usize, linear_weights: *mut f64, linear_
     let weights_as_slice = unsafe{
         std::slice::from_raw_parts_mut(linear_weights, linear_weights_len as usize)
     };
-    // TODO
-    // input_as_slice.to_vec() crashes!
-    let mut input_vec = vec![0.; input_as_slice.len()];
-    for i in 0..input_as_slice.len(){
-        input_vec[i] = input_as_slice[i];
-    }
-    let mut weight_vec = vec![0.; weights_as_slice.len()];
-    for i in 0..weights_as_slice.len(){
-        weight_vec[i] = weights_as_slice[i];
-    }
+    let input_vec = input_as_slice.to_vec();//vec![0.; input_as_slice.len()];
+    let weight_vec = weights_as_slice.to_vec();//vec![0.; weights_as_slice.len()];
     let input_tensor = Tensor{
         data: input_vec,
         shape: [2, 2]
@@ -108,6 +96,14 @@ fn dummy_nn(input: *mut f64, input_len: usize, linear_weights: *mut f64, linear_
     let linear_out = linear_layer(&input_tensor, &weights_tensor);
     softmax(&linear_out)
 }
+
+/// Dummy implementation
+fn dummy_nn_tensor(input: &Tensor, linear_weights: &Tensor) -> Tensor{
+    input.clone()
+    // let linear_out = linear_layer(&input_tensor, &weights_tensor);
+    // softmax(&linear_out)
+}
+
 #[derive(Debug, Clone)]
 struct Tensor{
     data: Vec<f64>,
@@ -135,35 +131,43 @@ fn multiply(left: &Tensor, right: &Tensor) -> Tensor
 
 fn main() {
     let mut input = vec![1., 2., 3., 4.];
+    let mut input_shadow = vec![1., 2., 3., 4.];
     let mut weights = vec![1.; 4];
     let mut weights_shadow = vec![0.; 4];
     let mut target = vec![0., 0., 1., 0.];
-    let mut net_output = vec![0., 0., 1., 0.];
-    for _i in 0..70{
-        let res = dummy_nn_with_loss(input.as_mut_ptr(),
-                                     input.len(),
-                                     weights.as_mut_ptr(),
-                                     weights.len(),
-                                     target.as_mut_ptr(),
-                                     target.len(),
-                                     net_output.as_mut_ptr(),
-                                     net_output.len());
-        println!("Loss: {:?}", res);
-        println!("Net output: {:?}", net_output);
+    let mut target_shadow = vec![0., 0., 1., 0.];
+
+    let input_left_ten = Tensor{
+        data: vec![1., 2., 3., 4.],
+        shape: [2, 2]
+    };
+    let input_right_ten = Tensor{
+        data: vec![1., 2., 3., 4.],
+        shape: [2, 2]
+    };
+    let mut input_left_ten_shadow = Tensor{
+        data: vec![1., 2., 3., 4.],
+        shape: [2, 2]
+    };
+    let mut input_right_ten_shadow = Tensor{
+        data: vec![1., 2., 3., 4.],
+        shape: [2, 2]
+    };
+    for _i in 0..5{
+        println!("{:?}", dummy_nn_tensor(&input_left_ten, &input_right_ten));
         unsafe {
-            __enzyme_autodiff(dummy_nn_with_loss as usize,
-                              ENZYME_CONST,
-                              input.as_mut_ptr(),
-                              ENZYME_CONST, input.len(),
-                              ENZYME_DUP, weights.as_mut_ptr(), weights_shadow.as_mut_ptr(),
-                              ENZYME_CONST, weights.len(),
-                              ENZYME_CONST, target.as_mut_ptr(),
-                              ENZYME_CONST, target.len(),
-                              ENZYME_CONST, net_output.as_mut_ptr(),
-                              ENZYME_CONST, net_output.len());
+            __enzyme_autodiff(dummy_nn_tensor as usize,
+                              ENZYME_DUP, &input_left_ten, &mut input_left_ten_shadow,
+                              ENZYME_DUP, &input_right_ten, &mut input_right_ten_shadow
+            );
         }
-        weights.iter_mut().zip(weights_shadow.iter()).for_each(|(weight, grad)|{
-            *weight = *weight - *grad*0.01;
-        });
+
     }
+
+    // Uncomment bellow for it to crash
+    // let output = dummy_nn(input.as_mut_ptr(),
+    //                       input.len(),
+    //                       weights.as_mut_ptr(),
+    //                       weights.len());
+    // println!("{:?}", output);
 }

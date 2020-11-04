@@ -14,7 +14,9 @@ fi
 echo "Copying!"
 cp $output_dir_n_file .
 cargo run --release --bin post
-opt $processed_input_llvm_filename -load=LLVMEnzyme-11.dylib -enzyme -o $output_llvm_filename -S
+opt $processed_input_llvm_filename -load=LLVMEnzyme-11.dylib -enzyme -enzyme-rust-type -enzyme-loose-types -o $output_llvm_filename -S
 clang -m64 $output_llvm_filename -Wl,-dead_strip -nodefaultlibs -lSystem -lresolv -lc -lm $(find $HOME/.rustup/toolchains/nightly-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib -name '*rlib') -o test.exec
 chmod +x ./test.exec
 ./test.exec
+
+# llvm-as oxide_enzyme_replaced.ll -o oxide_enzyme_replaced.bc

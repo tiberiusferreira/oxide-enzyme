@@ -14,18 +14,21 @@ path = "src/post_processing.rs"
 name = "oxide_enzyme"
 path = "src/main.rs"
 
-[profile.dev]
-lto = "thin"
-#panic = "abort"
+[[bin]]
+name = "ir-parser"
+path = "src/ir_parser.rs"
 
 [profile.release]
 lto = "thin"
+opt-level = 3
+debug = 2
+#debug-assertions = true
 #panic = "abort"
 
 
 [dependencies]
 serde = {version = "1.0.117", features=["derive"]}
-ndarray = "0.13.0"
-matrixmultiply = "0.2.3"
-
 serde_json = "1.0.59"
+llvm-ir = { version = "0.7.4", features = ["llvm-11"] }
+regex = "1.4.2"
+
