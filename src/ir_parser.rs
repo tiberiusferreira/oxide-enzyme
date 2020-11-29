@@ -37,7 +37,7 @@ fn get_all_params(input: String) -> HashMap<String, String>{
     debug_metadatas
 }
 
-fn get_rust_debug_metadata(tag: &str, metadata_vec: &[LLVMDebugTypeInformation]) -> Option<LLVMDebugTypeInformation>{
+pub fn get_rust_debug_metadata(tag: &str, metadata_vec: &[LLVMDebugTypeInformation]) -> Option<LLVMDebugTypeInformation>{
     metadata_vec
         .iter()
         .find(|a| a.location_tag == tag).cloned()
@@ -78,7 +78,7 @@ fn describe_local_var(value: &LLVMDebugTypeInformation, ir: &LLVMIRMetadata){
     if let Some(variant) = variable_type.get_variant(){
         match variant{
             Variant::LocalVariable => {}
-            Variant::SubroutineType => {}
+            Variant::DISubroutineType => {}
             Variant::DerivedType => {}
             Variant::BasicType => {
                 println!("BasicType! Encoding: {} Size: {} ", variable_type.parameters.get("encoding").unwrap(),
@@ -144,9 +144,18 @@ pub fn main(){
     };
     // println!("{}", ir.llvm_debug_type_information.len());
     for local_llvm_type in ir.llvm_debug_type_information.iter().take(50000) {
-        if matches!(local_llvm_type.get_variant().expect(&format!("No Variant for {:?}", local_llvm_type)), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType | Variant::CompositeType | Variant::TemplateTypeParameter){
-            let parsed_variant = parse_llvm_debug_type_information(&local_llvm_type);
+        if matches!(local_llvm_type.get_variant().expect(&format!("No Variant for {:?}", local_llvm_type)), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType | Variant::CompositeType | Variant::TemplateTypeParameter | Variant::DISubroutineType){
+            let parsed_variant = parse_llvm_debug_type_information(&local_llvm_type, &ir.llvm_debug_type_information);
             ast.inner.insert(local_llvm_type.location_tag.clone(), parsed_variant);
+        }
+    }
+
+    for (location_tag, ast_type) in ast.inner{
+        if let TypeAST::DILocalVariable(var) = ast_type{
+            println!("{:#?}", var);
+            // let a = get_rust_debug_metadata(&type_tag, &ir.llvm_debug_type_information).expect("Invalid tag");
+            // println!("{:?}", parse_llvm_debug_type_information(&a));
+            // println!("{:?}", var);
         }
     }
 

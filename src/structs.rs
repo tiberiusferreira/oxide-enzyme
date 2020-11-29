@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
+use crate::get_rust_debug_metadata;
 
 /// This corresponds to a link between the LLVM local variable and the debug information
 /// from a line such as:
@@ -27,34 +28,63 @@ pub struct LLVMDebugTypeInformation {
 }
 
 #[derive(Clone, Debug)]
-struct DILocalVariable{
-    file: String,
-    name: Option<String>,
-    arg: Option<String>,
-    line: String,
-    r#type: String,
-    scope: String,
+pub struct DILocalVariable{
+    pub file: String,
+    pub name: Option<String>,
+    pub arg: Option<String>,
+    pub line: String,
+    pub r#type: LocalVariableTypes,
+    pub scope: String,
 }
 
+// #[derive(Clone, Debug)]
+// pub struct DILocalVariableParsed{
+//     pub file: String,
+//     pub name: Option<String>,
+//     pub arg: Option<String>,
+//     pub line: String,
+//     pub r#type: LocalVariableTypes,
+//     pub scope: String,
+// }
+
 #[derive(Clone, Debug)]
-struct DIDerivedType{
+pub enum LocalVariableTypes{
+    DIDerivedType(DIDerivedType),
+    DIBasicType(DIBasicType),
+    DICompositeType(DICompositeType)
+}
+
+impl From<TypeAST> for LocalVariableTypes{
+    fn from(ast_type: TypeAST) -> Self {
+        match ast_type{
+            TypeAST::DerivedType(t) => LocalVariableTypes::DIDerivedType(t),
+            TypeAST::DIBasicType(t) => LocalVariableTypes::DIBasicType(t),
+            TypeAST::DICompositeType(t) => LocalVariableTypes::DICompositeType(t),
+            _ => panic!("Invalid type for local var type")
+        }
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct DIDerivedType{
     tag: String,
     align: String,
     dwarf_address_space: Option<String>,
     size: Option<String>,
     name: Option<String>,
-    base_type: String,
+    base_type: Box<BaseType>,
 }
 
 #[derive(Clone, Debug)]
-struct DIBasicType{
+pub struct DIBasicType{
     encoding: String,
     size: Option<String>,
     name: String,
 }
 
 #[derive(Clone, Debug)]
-struct DICompositeType{
+pub struct DICompositeType{
     tag: String,
     identifier: Option<String>,
     elements: String,
@@ -66,9 +96,14 @@ struct DICompositeType{
 }
 
 #[derive(Clone, Debug)]
-struct DITemplateTypeParameter{
+pub struct DITemplateTypeParameter{
     name: String,
     r#type: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct DISubroutineType{
+    types: String
 }
 
 #[derive(Debug, Clone)]
@@ -77,7 +112,28 @@ pub enum TypeAST{
     DerivedType(DIDerivedType),
     DIBasicType(DIBasicType),
     DICompositeType(DICompositeType),
-    DITemplateTypeParameter(DITemplateTypeParameter)
+    DISubroutineType(DISubroutineType),
+    DITemplateTypeParameter(DITemplateTypeParameter),
+}
+
+#[derive(Debug, Clone)]
+pub enum BaseType{
+    DIDerivedType(DIDerivedType),
+    DIBasicType(DIBasicType),
+    DICompositeType(DICompositeType),
+    DISubroutineType(DISubroutineType),
+}
+
+impl From<TypeAST> for BaseType{
+    fn from(ast_type: TypeAST) -> Self {
+        match ast_type{
+            TypeAST::DerivedType(t) => BaseType::DIDerivedType(t),
+            TypeAST::DIBasicType(t) => BaseType::DIBasicType(t),
+            TypeAST::DICompositeType(t) => BaseType::DICompositeType(t),
+            TypeAST::DISubroutineType(t) => BaseType::DISubroutineType(t),
+            _ => panic!("Invalid type for local var type")
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,31 +141,40 @@ pub struct Ast{
     pub inner: HashMap<String, TypeAST>
 }
 
-pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformation) -> TypeAST{
+
+pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformation, full_debug_type_info: &[LLVMDebugTypeInformation]) -> TypeAST{
     return match debug_type_info.get_variant().expect("No Variant"){
         Variant::LocalVariable => {
         let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in DILocalVariable", field)).clone();
         let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
+            let local_type = get_rust_debug_metadata(&get_val("type"),full_debug_type_info).expect("Invalid tag");
+            let local_var_type = LocalVariableTypes::from(parse_llvm_debug_type_information(&local_type, full_debug_type_info));
             TypeAST::DILocalVariable(DILocalVariable{
                 file: get_val("file"),
                 name: get_val_optional("name"),
                 arg: get_val_optional("arg"),
                 line: get_val("line"),
-                r#type: get_val("type"),
+                r#type: local_var_type,
                 scope: get_val("scope")
             })
         }
-        Variant::SubroutineType => {unimplemented!()}
+        Variant::DISubroutineType => {
+            let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in DISubroutineType", field)).clone();
+            TypeAST::DISubroutineType(DISubroutineType{
+                types: get_val("types")
+            })
+        }
         Variant::DerivedType => {
             let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in DIDerivedType", field)).clone();
             let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
+            let base_type = get_rust_debug_metadata(&get_val("baseType"),full_debug_type_info).expect("Invalid tag");
             TypeAST::DerivedType(DIDerivedType{
                 tag: get_val("tag"),
                 align: get_val("align"),
                 dwarf_address_space: get_val_optional("dwarfAddressSpace"),
                 size: get_val_optional("size"),
                 name: get_val_optional("name"),
-                base_type: get_val("baseType")
+                base_type: Box::new(BaseType::from(parse_llvm_debug_type_information(&base_type, full_debug_type_info)))
             })
         }
         Variant::BasicType => {
@@ -164,7 +229,7 @@ pub struct MultipleTagsTag{
 #[derive(Clone, Debug)]
 pub enum Variant{
     LocalVariable,
-    SubroutineType,
+    DISubroutineType,
     DerivedType,
     DILocation,
     DISubrange,
@@ -206,7 +271,7 @@ impl TryFrom<&str> for Variant{
     fn try_from(variant_str: &str) -> Result<Self, Self::Error> {
         match variant_str{
             "!DILocalVariable" => Ok(Self::LocalVariable),
-            "!DISubroutineType" => Ok(Self::SubroutineType),
+            "!DISubroutineType" => Ok(Self::DISubroutineType),
             "!DIDerivedType" => Ok(Self::DerivedType),
             "!DIBasicType" => Ok(Self::BasicType),
             "!DISubrange" => Ok(Self::DISubrange),
