@@ -139,22 +139,15 @@ fn describe_local_var(value: &LLVMDebugTypeInformation, ir: &LLVMIRMetadata){
 
 pub fn main(){
     let ir = LLVMIRMetadata::new("oxide_enzyme_replaced.ll");
-
-    for local_llvm_type in ir.llvm_debug_type_information.iter().take(5000) {
-        if matches!(local_llvm_type.get_variant().expect(&format!("No Variant for {:?}", local_llvm_type)), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType){
-            parse_llvm_debug_type_information(&local_llvm_type);
+    let mut ast = Ast{
+        inner: HashMap::new()
+    };
+    // println!("{}", ir.llvm_debug_type_information.len());
+    for local_llvm_type in ir.llvm_debug_type_information.iter().take(50000) {
+        if matches!(local_llvm_type.get_variant().expect(&format!("No Variant for {:?}", local_llvm_type)), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType | Variant::CompositeType | Variant::TemplateTypeParameter){
+            let parsed_variant = parse_llvm_debug_type_information(&local_llvm_type);
+            ast.inner.insert(local_llvm_type.location_tag.clone(), parsed_variant);
         }
-
-        // if let Some(variant) = single_rust_metadata.get_variant(){
-        //     if matches!(variant, Variant::LocalVariable){
-        //         println!("Is Local Variable");
-        //         describe_local_var(&single_rust_metadata, &ir);
-        //         println!();
-        //         println!();
-        //         println!();
-        //         println!();
-        //     }
-        // }
     }
 
     // for local_llvm_type in ir.llvm_local_type_variable_debug_info.iter().take(5000) {

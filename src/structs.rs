@@ -53,11 +53,36 @@ struct DIBasicType{
     name: String,
 }
 
+#[derive(Clone, Debug)]
+struct DICompositeType{
+    tag: String,
+    identifier: Option<String>,
+    elements: String,
+    vtable_holder: Option<String>,
+    flags: Option<String>,
+    name: Option<String>,
+    file: Option<String>,
+    align: String,
+}
+
+#[derive(Clone, Debug)]
+struct DITemplateTypeParameter{
+    name: String,
+    r#type: String,
+}
+
 #[derive(Debug, Clone)]
 pub enum TypeAST{
     DILocalVariable(DILocalVariable),
     DerivedType(DIDerivedType),
-    DIBasicType(DIBasicType)
+    DIBasicType(DIBasicType),
+    DICompositeType(DICompositeType),
+    DITemplateTypeParameter(DITemplateTypeParameter)
+}
+
+#[derive(Debug, Clone)]
+pub struct Ast{
+    pub inner: HashMap<String, TypeAST>
 }
 
 pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformation) -> TypeAST{
@@ -96,8 +121,27 @@ pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformat
                 name: get_val("name"),
             })
         }
-        Variant::CompositeType => {unimplemented!()}
-        Variant::TemplateTypeParameter => {unimplemented!()}
+        Variant::CompositeType => {
+            let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in CompositeType", field)).clone();
+            let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
+            TypeAST::DICompositeType(DICompositeType{
+                tag: get_val("tag"),
+                identifier: get_val_optional("identifier"),
+                elements: get_val("elements"),
+                vtable_holder: get_val_optional("vtableHolder"),
+                flags: get_val_optional("flags"),
+                name: get_val_optional("name"),
+                file: get_val_optional("file"),
+                align: get_val("align")
+            })
+        }
+        Variant::TemplateTypeParameter => {
+            let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in CompositeType", field)).clone();
+            TypeAST::DITemplateTypeParameter(DITemplateTypeParameter{
+                name: get_val("name"),
+                r#type: get_val("type")
+            })
+        }
         Variant::Namespace => {unimplemented!()}
         Variant::File => {unimplemented!()}
         Variant::GlobalVariableExpression => {unimplemented!()}
