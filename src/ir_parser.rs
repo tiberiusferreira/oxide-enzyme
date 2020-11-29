@@ -1,7 +1,5 @@
-use std::io::Read;
 use regex::Regex;
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
 use crate::structs::*;
 use crate::file_parser::*;
 
@@ -11,8 +9,8 @@ mod ir_transverser;
 
 pub struct LLVMIRMetadata{
     pub multiple_tags_tag: HashMap<String, Vec<String>>,
-    pub llvm_to_rust_metadata_link: Vec<LLVMToRustMetadataLink>,
-    pub rust_debug_metadata_explanation: Vec<RustDebugMetadataExplanation>
+    pub llvm_local_type_variable_debug_info: Vec<LLVMLocalTypeVariableDebugInfo>,
+    pub llvm_debug_type_information: Vec<LLVMDebugTypeInformation>
 }
 
 /// Extracts `!1485, !1489` into a `vec!["!1485", "!1489"]`
@@ -39,21 +37,42 @@ fn get_all_params(input: String) -> HashMap<String, String>{
     debug_metadatas
 }
 
-fn get_rust_debug_metadata(tag: &str, metadata_vec: &[RustDebugMetadataExplanation]) -> Option<RustDebugMetadataExplanation>{
+fn get_rust_debug_metadata(tag: &str, metadata_vec: &[LLVMDebugTypeInformation]) -> Option<LLVMDebugTypeInformation>{
     metadata_vec
         .iter()
         .find(|a| a.location_tag == tag).cloned()
 }
 
-fn describe_local_var(value: &RustDebugMetadataExplanation, ir: &LLVMIRMetadata){
-    let rust_metadata: &[RustDebugMetadataExplanation] = &ir.rust_debug_metadata_explanation;
+
+struct LocalVarType{
+    nested_types: Vec<String>
+}
+enum LocalVarTypeOrComposite{
+    Composite(Vec<String>),
+    LocalVarType(LocalVarType)
+}
+
+struct LocalVarTypeTree{
+    name: String
+}
+
+///
+fn describe_local_var(value: &LLVMDebugTypeInformation, ir: &LLVMIRMetadata){
+    let rust_metadata: &[LLVMDebugTypeInformation] = &ir.llvm_debug_type_information;
     println!("Getting local var type for {:#?}", value);
+    LocalVarTypeTree{
+        name: value.get_name().expect("Local var had no name")
+    };
     let variable_type = get_rust_debug_metadata(&value.parameters.get("type").unwrap(), rust_metadata).unwrap();
+    // let type_name = variable_type.parameters.get("name").expect("Type had no name");
+    // let output = LocalVarType{nested_types: vec!["Pointer!".to_string()]};
+    //
 
     if let Some(tag) = variable_type.get_tag(){
         if matches!(tag, Tag::TagPointerType){
             println!("Pointer!");
-            return;
+            // return LocalVarTypeOrComposite::LocalVarType(LocalVarType{nested_types: vec!["Pointer!".to_string()]});
+            return ;
         }
     }
     if let Some(variant) = variable_type.get_variant(){
@@ -81,10 +100,11 @@ fn describe_local_var(value: &RustDebugMetadataExplanation, ir: &LLVMIRMetadata)
                                 println!("Structure type!");
                                 let elements = variable_type.parameters.get("elements").expect("No elements tag!");
                                 let elements_tags = ir.multiple_tags_tag.get(elements).unwrap();
-                                for el in elements_tags{
-                                    let dbg = get_rust_debug_metadata(el, &ir.rust_debug_metadata_explanation).unwrap();
-                                    describe_local_var(&dbg, &ir);
-                                }
+                                return;
+                                // for el in elements_tags{
+                                //     let dbg = get_rust_debug_metadata(el, &ir.llvm_debug_type_information).unwrap();
+                                //     describe_local_var(&dbg, &ir);
+                                // }
                                 // get_rust_debug_metadata(elements, rust_metadata).unwrap();
                             }
                             Tag::TagMember => {}
@@ -107,25 +127,55 @@ fn describe_local_var(value: &RustDebugMetadataExplanation, ir: &LLVMIRMetadata)
             Variant::File => {}
             Variant::GlobalVariableExpression => {}
             Variant::Enumerator => {}
+            Variant::DISubrange => {}
+            Variant::DILocation => {}
+            _ => {}
         }
     }
     println!("{:?}", variable_type);
     panic!("Local variable type has not tag!");
 }
 
+
 pub fn main(){
     let ir = LLVMIRMetadata::new("oxide_enzyme_replaced.ll");
 
-    for local_llvm_type in &ir.llvm_to_rust_metadata_link {
-        println!("Investigating: {:#?}", local_llvm_type);
-        let single_rust_metadata = get_rust_debug_metadata(&local_llvm_type.location_tag, &ir.rust_debug_metadata_explanation).unwrap();
-        if let Some(variant) = single_rust_metadata.get_variant(){
-            if matches!(variant, Variant::LocalVariable){
-                println!("Is Local Variable");
-                describe_local_var(&single_rust_metadata, &ir);
-            }
+    for local_llvm_type in ir.llvm_debug_type_information.iter().take(5000) {
+        if matches!(local_llvm_type.get_variant().expect(&format!("No Variant for {:?}", local_llvm_type)), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType){
+            parse_llvm_debug_type_information(&local_llvm_type);
         }
+
+        // if let Some(variant) = single_rust_metadata.get_variant(){
+        //     if matches!(variant, Variant::LocalVariable){
+        //         println!("Is Local Variable");
+        //         describe_local_var(&single_rust_metadata, &ir);
+        //         println!();
+        //         println!();
+        //         println!();
+        //         println!();
+        //     }
+        // }
     }
+
+    // for local_llvm_type in ir.llvm_local_type_variable_debug_info.iter().take(5000) {
+    //     // println!("Investigating: {:#?}", local_llvm_type);
+    //     let single_rust_metadata = get_rust_debug_metadata(&local_llvm_type.location_tag, &ir.llvm_debug_type_information).unwrap();
+    //     // println!("{:?}", &single_rust_metadata);
+    //     if matches!(single_rust_metadata.get_variant().expect("No Variant"), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType){
+    //         parse_llvm_debug_type_information(&single_rust_metadata);
+    //     }
+    //
+    //     // if let Some(variant) = single_rust_metadata.get_variant(){
+    //     //     if matches!(variant, Variant::LocalVariable){
+    //     //         println!("Is Local Variable");
+    //     //         describe_local_var(&single_rust_metadata, &ir);
+    //     //         println!();
+    //     //         println!();
+    //     //         println!();
+    //     //         println!();
+    //     //     }
+    //     // }
+    // }
 
 
 }

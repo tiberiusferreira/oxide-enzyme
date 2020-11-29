@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-use regex::Regex;
 
 /// This corresponds to a link between the LLVM local variable and the debug information
 /// from a line such as:
 /// `call void @llvm.dbg.value(metadata %"std::fmt::Formatter"* %f, metadata !214, metadata !DIExpression()), !dbg !217`
 #[derive(Debug, Clone)]
-pub struct LLVMToRustMetadataLink {
+pub struct LLVMLocalTypeVariableDebugInfo {
     /// In the example above: `%Tensor`
     pub local_var_type: String,
     /// In the example above: `%left`
@@ -18,7 +17,7 @@ pub struct LLVMToRustMetadataLink {
 /// This corresponds to the Rust Metadata information, such as
 /// !1298 = !DIDerivedType(tag: DwTagPointerType, name: "&mut alloc::vec::Vec<f64>", baseType: !6, size: 64, align: 64, dwarfAddressSpace: 0)
 #[derive(Debug, Clone)]
-pub struct RustDebugMetadataExplanation {
+pub struct LLVMDebugTypeInformation {
     /// In the example above: `!1298`
     pub location_tag: String,
     /// In the example above: `!DIDerivedType`
@@ -26,6 +25,89 @@ pub struct RustDebugMetadataExplanation {
     /// A HashMap of each name:value, such as `tag` -> `DwTagPointerType`
     pub parameters: HashMap<String, String>,
 }
+
+#[derive(Clone, Debug)]
+struct DILocalVariable{
+    file: String,
+    name: Option<String>,
+    arg: Option<String>,
+    line: String,
+    r#type: String,
+    scope: String,
+}
+
+#[derive(Clone, Debug)]
+struct DIDerivedType{
+    tag: String,
+    align: String,
+    dwarf_address_space: Option<String>,
+    size: Option<String>,
+    name: Option<String>,
+    base_type: String,
+}
+
+#[derive(Clone, Debug)]
+struct DIBasicType{
+    encoding: String,
+    size: Option<String>,
+    name: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeAST{
+    DILocalVariable(DILocalVariable),
+    DerivedType(DIDerivedType),
+    DIBasicType(DIBasicType)
+}
+
+pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformation) -> TypeAST{
+    return match debug_type_info.get_variant().expect("No Variant"){
+        Variant::LocalVariable => {
+        let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in DILocalVariable", field)).clone();
+        let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
+            TypeAST::DILocalVariable(DILocalVariable{
+                file: get_val("file"),
+                name: get_val_optional("name"),
+                arg: get_val_optional("arg"),
+                line: get_val("line"),
+                r#type: get_val("type"),
+                scope: get_val("scope")
+            })
+        }
+        Variant::SubroutineType => {unimplemented!()}
+        Variant::DerivedType => {
+            let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in DIDerivedType", field)).clone();
+            let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
+            TypeAST::DerivedType(DIDerivedType{
+                tag: get_val("tag"),
+                align: get_val("align"),
+                dwarf_address_space: get_val_optional("dwarfAddressSpace"),
+                size: get_val_optional("size"),
+                name: get_val_optional("name"),
+                base_type: get_val("baseType")
+            })
+        }
+        Variant::BasicType => {
+            let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in BasicType", field)).clone();
+            let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
+            TypeAST::DIBasicType(DIBasicType{
+                encoding: get_val("encoding"),
+                size: get_val_optional("size"),
+                name: get_val("name"),
+            })
+        }
+        Variant::CompositeType => {unimplemented!()}
+        Variant::TemplateTypeParameter => {unimplemented!()}
+        Variant::Namespace => {unimplemented!()}
+        Variant::File => {unimplemented!()}
+        Variant::GlobalVariableExpression => {unimplemented!()}
+        Variant::Enumerator => {unimplemented!()}
+        Variant::DISubrange => {unimplemented!()}
+        Variant::DILocation => {unimplemented!()}
+        _ => {unimplemented!()}
+    }
+}
+
 
 /// This corresponds to the Rust Metadata information, such as
 /// !1488 = !{!1485, !1489}
@@ -40,6 +122,9 @@ pub enum Variant{
     LocalVariable,
     SubroutineType,
     DerivedType,
+    DILocation,
+    DISubrange,
+    DILexicalBlockFile,
     BasicType,
     CompositeType,
     TemplateTypeParameter,
@@ -80,6 +165,9 @@ impl TryFrom<&str> for Variant{
             "!DISubroutineType" => Ok(Self::SubroutineType),
             "!DIDerivedType" => Ok(Self::DerivedType),
             "!DIBasicType" => Ok(Self::BasicType),
+            "!DISubrange" => Ok(Self::DISubrange),
+            "!DILexicalBlockFile" => Ok(Self::DILexicalBlockFile),
+            "!DILocation" => Ok(Self::DILocation),
             "!DICompositeType" => Ok(Self::CompositeType),
             "!DITemplateTypeParameter" => Ok(Self::TemplateTypeParameter),
             "!DINamespace" => Ok(Self::Namespace),
@@ -91,12 +179,16 @@ impl TryFrom<&str> for Variant{
     }
 }
 
-impl RustDebugMetadataExplanation{
+impl LLVMDebugTypeInformation {
     pub fn get_variant(&self) -> Option<Variant>{
         self.variant.as_str().try_into().ok()
     }
     pub fn get_tag(&self) -> Option<Tag>{
         self.parameters.get("tag").map(|e| e.as_str().try_into().ok()).flatten()
+    }
+
+    pub fn get_name(&self) -> Option<String>{
+        self.parameters.get("name").cloned()
     }
 }
 

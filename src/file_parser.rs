@@ -1,4 +1,4 @@
-use crate::structs::{MultipleTagsTag, LLVMToRustMetadataLink, RustDebugMetadataExplanation};
+use crate::structs::{LLVMLocalTypeVariableDebugInfo, LLVMDebugTypeInformation};
 use regex::Regex;
 use std::io::Read;
 use crate::{LLVMIRMetadata, extract_llvm_multiple_tags, get_all_params};
@@ -14,8 +14,8 @@ impl LLVMIRMetadata{
         let multi_tags_tag = extract_llvm_multiple_tags_tag(&file_as_string);
         Self{
             multiple_tags_tag: multi_tags_tag,
-            llvm_to_rust_metadata_link,
-            rust_debug_metadata_explanation: rust_metadata
+            llvm_local_type_variable_debug_info: llvm_to_rust_metadata_link,
+            llvm_debug_type_information: rust_metadata
         }
     }
 }
@@ -36,14 +36,14 @@ pub fn extract_llvm_multiple_tags_tag(file_as_string: &str) -> HashMap<String, V
     multiple_tags_tag_vec
 }
 
-pub fn extract_llvm_to_rust_metadata(file_as_string: &str) -> Vec<LLVMToRustMetadataLink>{
-    // works on lines like: @llvm.dbg.value(metadata %"std::fmt::Formatter"* %f, metadata !214, metadata !DIExpression()), !dbg !217
+/// Parses lines like: @llvm.dbg.value(metadata %"std::fmt::Formatter"* %f, metadata !214, metadata !DIExpression()), !dbg !217
+pub fn extract_llvm_to_rust_metadata(file_as_string: &str) -> Vec<LLVMLocalTypeVariableDebugInfo>{
     let debug_value_regex = r#"@llvm\.dbg\.value\(metadata (\S+) (\S+), metadata ([^,]+), metadata !DIExpression\(\)\)"#;
     let regex = Regex::new(debug_value_regex).unwrap();
     let mut debug_metadatas = vec![];
     for caps in regex.captures_iter(&file_as_string){
         assert_eq!(caps.len(), 4);
-        debug_metadatas.push(LLVMToRustMetadataLink {
+        debug_metadatas.push(LLVMLocalTypeVariableDebugInfo {
             // the first capture contains the whole regex match
             local_var_type: caps[1].to_string(),
             local_var_name: caps[2].to_string(),
@@ -53,13 +53,13 @@ pub fn extract_llvm_to_rust_metadata(file_as_string: &str) -> Vec<LLVMToRustMeta
     debug_metadatas
 }
 
-pub fn extract_rust_metadata(file_as_string: &str) -> Vec<RustDebugMetadataExplanation>{
+pub fn extract_rust_metadata(file_as_string: &str) -> Vec<LLVMDebugTypeInformation>{
     let debug_value_description = r#"(!\d+) = (!\S+)\((.+)\)"#;
     let re = Regex::new(debug_value_description).unwrap();
     let mut debug_metadatas_explanation = vec![];
     for caps in re.captures_iter(&file_as_string){
         assert_eq!(caps.len(), 4);
-        debug_metadatas_explanation.push(RustDebugMetadataExplanation {
+        debug_metadatas_explanation.push(LLVMDebugTypeInformation {
             location_tag: caps[1].to_string(),
             variant: caps[2].to_string(),
             parameters: get_all_params(caps[3].to_string())
