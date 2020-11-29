@@ -142,13 +142,13 @@ pub struct Ast{
 }
 
 
-pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformation, full_debug_type_info: &[LLVMDebugTypeInformation]) -> TypeAST{
+pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformation, full_debug_type_info: &[LLVMDebugTypeInformation], multiple_tags_tag: &HashMap<String, Vec<String>>) -> TypeAST{
     return match debug_type_info.get_variant().expect("No Variant"){
         Variant::LocalVariable => {
         let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in DILocalVariable", field)).clone();
         let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
             let local_type = get_rust_debug_metadata(&get_val("type"),full_debug_type_info).expect("Invalid tag");
-            let local_var_type = LocalVariableTypes::from(parse_llvm_debug_type_information(&local_type, full_debug_type_info));
+            let local_var_type = LocalVariableTypes::from(parse_llvm_debug_type_information(&local_type, full_debug_type_info, multiple_tags_tag));
             TypeAST::DILocalVariable(DILocalVariable{
                 file: get_val("file"),
                 name: get_val_optional("name"),
@@ -174,7 +174,7 @@ pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformat
                 dwarf_address_space: get_val_optional("dwarfAddressSpace"),
                 size: get_val_optional("size"),
                 name: get_val_optional("name"),
-                base_type: Box::new(BaseType::from(parse_llvm_debug_type_information(&base_type, full_debug_type_info)))
+                base_type: Box::new(BaseType::from(parse_llvm_debug_type_information(&base_type, full_debug_type_info, multiple_tags_tag)))
             })
         }
         Variant::BasicType => {
@@ -189,6 +189,12 @@ pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformat
         Variant::CompositeType => {
             let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in CompositeType", field)).clone();
             let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
+            let els = multiple_tags_tag.get(&get_val("elements")).expect("Invalid tag for tags");
+            for el in els{
+                let a = get_rust_debug_metadata(el, full_debug_type_info).expect("Invalid tag");
+                println!("{:?}", a.get_variant().expect("No Variant!"));
+            }
+            // println!("{:?}", els);
             TypeAST::DICompositeType(DICompositeType{
                 tag: get_val("tag"),
                 identifier: get_val_optional("identifier"),

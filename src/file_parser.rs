@@ -23,14 +23,17 @@ impl LLVMIRMetadata{
 
 pub fn extract_llvm_multiple_tags_tag(file_as_string: &str) -> HashMap<String, Vec<String>>{
     // works on lines like: @llvm.dbg.value(metadata %"std::fmt::Formatter"* %f, metadata !214, metadata !DIExpression()), !dbg !217
-    let line_number_and_tags = r#"(!\d+) = !\{(!.+)\}"#;
+    let line_number_and_tags = r#"(!\d+) = !\{(!.+)?\}"#;
     let regex = Regex::new(line_number_and_tags).unwrap();
     let mut multiple_tags_tag_vec = HashMap::new();
     for caps in regex.captures_iter(&file_as_string){
-        assert_eq!(caps.len(), 3);
+        assert_eq!(caps.len(), 3); // don't trust this, capture group could have no group
         let location_tag = &caps[1];
-        let tags = &caps[2];
-        let tags = extract_llvm_multiple_tags(tags);
+        let tags = if let Some(tags) = &caps.get(2){
+            extract_llvm_multiple_tags(tags.as_str())
+        }else{
+            vec![]
+        };
         multiple_tags_tag_vec.insert(location_tag.to_string(), tags);
     };
     multiple_tags_tag_vec
