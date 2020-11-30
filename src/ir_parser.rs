@@ -142,8 +142,6 @@ pub fn main(){
     let mut ast = Ast{
         inner: HashMap::new()
     };
-
-    // println!("{}", ir.llvm_debug_type_information.len());
     for local_llvm_type in ir.llvm_debug_type_information.iter().take(50000) {
         if matches!(local_llvm_type.get_variant().expect(&format!("No Variant for {:?}", local_llvm_type)), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType | Variant::CompositeType | Variant::TemplateTypeParameter | Variant::DISubroutineType){
             let parsed_variant = parse_llvm_debug_type_information(&local_llvm_type, &ir.llvm_debug_type_information, &ir.multiple_tags_tag);
@@ -153,32 +151,8 @@ pub fn main(){
 
     for (location_tag, ast_type) in ast.inner{
         if let TypeAST::DILocalVariable(var) = ast_type{
-            // println!("{:#?}", var);
-            // let a = get_rust_debug_metadata(&type_tag, &ir.llvm_debug_type_information).expect("Invalid tag");
-            // println!("{:?}", parse_llvm_debug_type_information(&a));
-            // println!("{:?}", var);
+            println!("{:#?}", var);
         }
     }
-
-    // for local_llvm_type in ir.llvm_local_type_variable_debug_info.iter().take(5000) {
-    //     // println!("Investigating: {:#?}", local_llvm_type);
-    //     let single_rust_metadata = get_rust_debug_metadata(&local_llvm_type.location_tag, &ir.llvm_debug_type_information).unwrap();
-    //     // println!("{:?}", &single_rust_metadata);
-    //     if matches!(single_rust_metadata.get_variant().expect("No Variant"), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType){
-    //         parse_llvm_debug_type_information(&single_rust_metadata);
-    //     }
-    //
-    //     // if let Some(variant) = single_rust_metadata.get_variant(){
-    //     //     if matches!(variant, Variant::LocalVariable){
-    //     //         println!("Is Local Variable");
-    //     //         describe_local_var(&single_rust_metadata, &ir);
-    //     //         println!();
-    //     //         println!();
-    //     //         println!();
-    //     //         println!();
-    //     //     }
-    //     // }
-    // }
-
 
 }

@@ -37,16 +37,6 @@ pub struct DILocalVariable{
     pub scope: String,
 }
 
-// #[derive(Clone, Debug)]
-// pub struct DILocalVariableParsed{
-//     pub file: String,
-//     pub name: Option<String>,
-//     pub arg: Option<String>,
-//     pub line: String,
-//     pub r#type: LocalVariableTypes,
-//     pub scope: String,
-// }
-
 #[derive(Clone, Debug)]
 pub enum LocalVariableTypes{
     DIDerivedType(DIDerivedType),
@@ -87,13 +77,35 @@ pub struct DIBasicType{
 pub struct DICompositeType{
     tag: String,
     identifier: Option<String>,
-    elements: String,
+    elements: Vec<CompositeTypeElements>, // DerivedType, DISubrange, Enumerator, CompositeType
     vtable_holder: Option<String>,
     flags: Option<String>,
     name: Option<String>,
     file: Option<String>,
     align: String,
 }
+
+#[derive(Clone, Debug)]
+pub enum CompositeTypeElements{
+    DIDerivedType(DIDerivedType),
+    DICompositeType(DICompositeType),
+    DIEnumerator(DIEnumerator),
+    DISubrange(DISubrange)
+}
+
+impl From<TypeAST> for CompositeTypeElements{
+    fn from(ast_type: TypeAST) -> Self {
+        match ast_type{
+            TypeAST::DerivedType(t) => CompositeTypeElements::DIDerivedType(t),
+            TypeAST::DICompositeType(t) => CompositeTypeElements::DICompositeType(t),
+            TypeAST::DIEnumerator(t) => CompositeTypeElements::DIEnumerator(t),
+            TypeAST::DISubrange(t) => CompositeTypeElements::DISubrange(t),
+            _ => panic!("Invalid type for BaseType")
+        }
+    }
+}
+
+
 
 #[derive(Clone, Debug)]
 pub struct DITemplateTypeParameter{
@@ -106,6 +118,18 @@ pub struct DISubroutineType{
     types: String
 }
 
+#[derive(Clone, Debug)]
+pub struct DIEnumerator{
+    name: String,
+    value: String
+}
+
+#[derive(Clone, Debug)]
+pub struct DISubrange{
+    count: String,
+    lower_bound: String
+}
+
 #[derive(Debug, Clone)]
 pub enum TypeAST{
     DILocalVariable(DILocalVariable),
@@ -114,6 +138,8 @@ pub enum TypeAST{
     DICompositeType(DICompositeType),
     DISubroutineType(DISubroutineType),
     DITemplateTypeParameter(DITemplateTypeParameter),
+    DIEnumerator(DIEnumerator),
+    DISubrange(DISubrange)
 }
 
 #[derive(Debug, Clone)]
@@ -131,7 +157,7 @@ impl From<TypeAST> for BaseType{
             TypeAST::DIBasicType(t) => BaseType::DIBasicType(t),
             TypeAST::DICompositeType(t) => BaseType::DICompositeType(t),
             TypeAST::DISubroutineType(t) => BaseType::DISubroutineType(t),
-            _ => panic!("Invalid type for local var type")
+            _ => panic!("Invalid type for BaseType")
         }
     }
 }
@@ -190,15 +216,17 @@ pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformat
             let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in CompositeType", field)).clone();
             let get_val_optional = |field: &str| debug_type_info.parameters.get(field).cloned();
             let els = multiple_tags_tag.get(&get_val("elements")).expect("Invalid tag for tags");
+            let mut composite_els = vec![];
             for el in els{
                 let a = get_rust_debug_metadata(el, full_debug_type_info).expect("Invalid tag");
-                println!("{:?}", a.get_variant().expect("No Variant!"));
+                let b = parse_llvm_debug_type_information(&a, full_debug_type_info, multiple_tags_tag);
+                composite_els.push(CompositeTypeElements::from(b))
             }
             // println!("{:?}", els);
             TypeAST::DICompositeType(DICompositeType{
                 tag: get_val("tag"),
                 identifier: get_val_optional("identifier"),
-                elements: get_val("elements"),
+                elements: composite_els,
                 vtable_holder: get_val_optional("vtableHolder"),
                 flags: get_val_optional("flags"),
                 name: get_val_optional("name"),
@@ -216,8 +244,20 @@ pub fn parse_llvm_debug_type_information(debug_type_info: &LLVMDebugTypeInformat
         Variant::Namespace => {unimplemented!()}
         Variant::File => {unimplemented!()}
         Variant::GlobalVariableExpression => {unimplemented!()}
-        Variant::Enumerator => {unimplemented!()}
-        Variant::DISubrange => {unimplemented!()}
+        Variant::Enumerator => {
+            let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in CompositeType", field)).clone();
+            TypeAST::DIEnumerator(DIEnumerator{
+                name: get_val("name"),
+                value: get_val("value")
+            })
+        }
+        Variant::DISubrange => {
+            let get_val = |field: &str| debug_type_info.parameters.get(field).expect(&format!("No {} in CompositeType", field)).clone();
+            TypeAST::DISubrange(DISubrange{
+                count: get_val("count"),
+                lower_bound: get_val("lowerBound")
+            })
+        }
         Variant::DILocation => {unimplemented!()}
         _ => {unimplemented!()}
     }
