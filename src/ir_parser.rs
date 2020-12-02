@@ -1,7 +1,8 @@
+//! aw
+//!
 use regex::Regex;
 use std::collections::HashMap;
 use crate::structs::*;
-use crate::file_parser::*;
 
 mod structs;
 mod file_parser;
@@ -44,97 +45,6 @@ pub fn get_rust_debug_metadata(tag: &str, metadata_vec: &[LLVMDebugTypeInformati
 }
 
 
-struct LocalVarType{
-    nested_types: Vec<String>
-}
-enum LocalVarTypeOrComposite{
-    Composite(Vec<String>),
-    LocalVarType(LocalVarType)
-}
-
-struct LocalVarTypeTree{
-    name: String
-}
-
-///
-fn describe_local_var(value: &LLVMDebugTypeInformation, ir: &LLVMIRMetadata){
-    let rust_metadata: &[LLVMDebugTypeInformation] = &ir.llvm_debug_type_information;
-    println!("Getting local var type for {:#?}", value);
-    LocalVarTypeTree{
-        name: value.get_name().expect("Local var had no name")
-    };
-    let variable_type = get_rust_debug_metadata(&value.parameters.get("type").unwrap(), rust_metadata).unwrap();
-    // let type_name = variable_type.parameters.get("name").expect("Type had no name");
-    // let output = LocalVarType{nested_types: vec!["Pointer!".to_string()]};
-    //
-
-    if let Some(tag) = variable_type.get_tag(){
-        if matches!(tag, Tag::TagPointerType){
-            println!("Pointer!");
-            // return LocalVarTypeOrComposite::LocalVarType(LocalVarType{nested_types: vec!["Pointer!".to_string()]});
-            return ;
-        }
-    }
-    if let Some(variant) = variable_type.get_variant(){
-        match variant{
-            Variant::LocalVariable => {}
-            Variant::DISubroutineType => {}
-            Variant::DerivedType => {}
-            Variant::BasicType => {
-                println!("BasicType! Encoding: {} Size: {} ", variable_type.parameters.get("encoding").unwrap(),
-                         variable_type.parameters.get("size").unwrap());
-                return;
-            }
-            Variant::CompositeType => {
-                println!("CompositeType!");
-                match variable_type.get_tag() {
-                    None => {
-                        println!("No tag for CompositeType!");
-                        println!("{:?}", variable_type);
-                        panic!()
-                    }
-                    Some(tag) => {
-                        match tag{
-                            Tag::TagPointerType => {}
-                            Tag::TagStructureType => {
-                                println!("Structure type!");
-                                let elements = variable_type.parameters.get("elements").expect("No elements tag!");
-                                let elements_tags = ir.multiple_tags_tag.get(elements).unwrap();
-                                return;
-                                // for el in elements_tags{
-                                //     let dbg = get_rust_debug_metadata(el, &ir.llvm_debug_type_information).unwrap();
-                                //     describe_local_var(&dbg, &ir);
-                                // }
-                                // get_rust_debug_metadata(elements, rust_metadata).unwrap();
-                            }
-                            Tag::TagMember => {}
-                            Tag::TagVariantPart => {}
-                            Tag::TagArrayType => {
-                                println!("Array Type!");
-                                if let Some(base_type) = variable_type.parameters.get("baseType"){
-                                    println!("Base Type = {}", base_type);
-                                }else{
-                                    panic!("Not base type for array!");
-                                }
-                            }
-                        }
-                    }
-                }
-                return;
-            }
-            Variant::TemplateTypeParameter => {}
-            Variant::Namespace => {}
-            Variant::File => {}
-            Variant::GlobalVariableExpression => {}
-            Variant::Enumerator => {}
-            Variant::DISubrange => {}
-            Variant::DILocation => {}
-            _ => {}
-        }
-    }
-    println!("{:?}", variable_type);
-    panic!("Local variable type has not tag!");
-}
 
 
 pub fn main(){
@@ -142,14 +52,14 @@ pub fn main(){
     let mut ast = Ast{
         inner: HashMap::new()
     };
-    for local_llvm_type in ir.llvm_debug_type_information.iter().take(50000) {
+    for local_llvm_type in &ir.llvm_debug_type_information {
         if matches!(local_llvm_type.get_variant().expect(&format!("No Variant for {:?}", local_llvm_type)), Variant::LocalVariable | Variant::BasicType | Variant::DerivedType | Variant::CompositeType | Variant::TemplateTypeParameter | Variant::DISubroutineType){
             let parsed_variant = parse_llvm_debug_type_information(&local_llvm_type, &ir.llvm_debug_type_information, &ir.multiple_tags_tag);
             ast.inner.insert(local_llvm_type.location_tag.clone(), parsed_variant);
         }
     }
 
-    for (location_tag, ast_type) in ast.inner{
+    for (_location_tag, ast_type) in ast.inner{
         if let TypeAST::DILocalVariable(var) = ast_type{
             println!("{:#?}", var);
         }

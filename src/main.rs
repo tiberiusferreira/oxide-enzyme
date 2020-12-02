@@ -22,15 +22,13 @@ fn softmax(tensor: &Tensor) -> Tensor{
     let sum_exp_all: f64 = tensor.data.iter().fold(0., |acc, d|{
         acc + d.exp()
     });
-    /*
     let mut out: Vec<f64> = vec![0.; tensor.data.len()];
     for i in 0..tensor.data.len(){
         out[i] = tensor.data[i].exp()/sum_exp_all;
     }
-    */
-    let out: Vec<f64> = tensor.data.iter().map(|d|{
-        d.exp()/sum_exp_all
-    }).collect();
+    // let out: Vec<f64> = tensor.data.iter().map(|d|{
+    //     d.exp()/sum_exp_all
+    // }).collect();
     Tensor{
         data: out,
         shape: tensor.shape.clone()
@@ -98,10 +96,10 @@ fn dummy_nn(input: *mut f64, input_len: usize, linear_weights: *mut f64, linear_
 }
 
 /// Dummy implementation
-fn dummy_nn_tensor(input: &Tensor, linear_weights: &Tensor) -> Tensor{
-    input.clone()
-    // let linear_out = linear_layer(&input_tensor, &weights_tensor);
-    // softmax(&linear_out)
+fn dummy_nn_tensor(input: &Tensor, linear_weights: &Tensor) -> f64{
+    // input.clone()
+    // let linear_out = linear_layer(&input, &linear_weights);
+    cross_entropy(&input, linear_weights)
 }
 
 #[derive(Debug, Clone)]
