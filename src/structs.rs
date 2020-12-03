@@ -5,7 +5,7 @@ use crate::get_rust_debug_metadata;
 /// This corresponds to a link between the LLVM local variable and the debug information
 /// from a line such as:
 /// `call void @llvm.dbg.value(metadata %"std::fmt::Formatter"* %f, metadata !214, metadata !DIExpression()), !dbg !217`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct LLVMLocalTypeVariableDebugInfo {
     /// In the example above: `%Tensor`
     pub local_var_type: String,
@@ -58,31 +58,31 @@ impl From<TypeAST> for LocalVariableTypes{
 
 #[derive(Clone, Debug)]
 pub struct DIDerivedType{
-    tag: String,
-    align: String,
-    dwarf_address_space: Option<String>,
-    size: Option<String>,
-    name: Option<String>,
-    base_type: Box<BaseType>,
+    pub tag: String,
+    pub align: String,
+    pub dwarf_address_space: Option<String>,
+    pub size: Option<String>,
+    pub name: Option<String>,
+    pub base_type: Box<BaseType>,
 }
 
 #[derive(Clone, Debug)]
 pub struct DIBasicType{
-    encoding: String,
-    size: Option<String>,
-    name: String,
+    pub encoding: String,
+    pub size: Option<String>,
+    pub name: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct DICompositeType{
-    tag: String,
-    identifier: Option<String>,
-    elements: Vec<CompositeTypeElements>, // DerivedType, DISubrange, Enumerator, CompositeType
-    vtable_holder: Option<String>,
-    flags: Option<String>,
-    name: Option<String>,
-    file: Option<String>,
-    align: String,
+    pub tag: String,
+    pub identifier: Option<String>,
+    pub elements: Vec<CompositeTypeElements>, // DerivedType, DISubrange, Enumerator, CompositeType
+    pub vtable_holder: Option<String>,
+    pub flags: Option<String>,
+    pub name: Option<String>,
+    pub file: Option<String>,
+    pub align: String,
 }
 
 #[derive(Clone, Debug)]

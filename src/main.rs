@@ -1,5 +1,10 @@
 extern {
     fn __enzyme_autodiff(_: usize, ...);
+    fn __enzyme_float(pointer: usize, size: usize);
+}
+
+pub fn mark_as_float32(f: &f32){
+    unsafe { __enzyme_float(f as *const f32 as usize, std::mem::size_of_val(f)); }
 }
 
 /// Yep, magic numbers, we look for those number in the output llvm-ir and replace them with metadata
@@ -126,6 +131,14 @@ fn multiply(left: &Tensor, right: &Tensor) -> Tensor
     }
 }
 
+// #[derive(Debug, Clone)]
+// pub struct TensorWrapper{
+//     tensor_1: Vec<Tensor>
+// }
+
+// pub fn print_ten(a: TensorWrapper){
+//     println!("{:?}", a);
+// }
 
 fn main() {
     let mut input = vec![1., 2., 3., 4.];
@@ -143,6 +156,12 @@ fn main() {
         data: vec![1., 2., 3., 4.],
         shape: [2, 2]
     };
+
+    // let sample_wrapper = TensorWrapper{
+    //     tensor_1: vec![]
+    // };
+    // print_ten(sample_wrapper);
+
     let mut input_left_ten_shadow = Tensor{
         data: vec![1., 2., 3., 4.],
         shape: [2, 2]
@@ -151,6 +170,8 @@ fn main() {
         data: vec![1., 2., 3., 4.],
         shape: [2, 2]
     };
+    let b = 0.2;
+    mark_as_float32(&b);
     for _i in 0..5{
         println!("{:?}", dummy_nn_tensor(&input_left_ten, &input_right_ten));
         unsafe {
