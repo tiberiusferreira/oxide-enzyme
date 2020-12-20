@@ -235,10 +235,10 @@ fn bindgen_test_layout_CFnTypeInfo() {
 #[repr(u32)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum CDIFFE_TYPE {
-    DFT_OUT_DIFF = 0,
-    DFT_DUP_ARG = 1,
-    DFT_CONSTANT = 2,
-    DFT_DUP_NONEED = 3,
+    DFT_OUT_DIFF = 0,   // add differential to an output struct
+    DFT_DUP_ARG = 1,    // duplicate the argument and store differential inside
+    DFT_CONSTANT = 2,   // no differential
+    DFT_DUP_NONEED = 3, // duplicate this argument and store differential inside, but don't need the forward
 }
 extern "C" {
     pub fn EnzymeGetGlobalAA(arg1: LLVMModuleRef) -> EnzymeAAResultsRef;

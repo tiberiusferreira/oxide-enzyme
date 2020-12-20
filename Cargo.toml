@@ -1,9 +1,6 @@
-[package]
-name = "oxidize-enzyme"
-version = "0.1.0"
-authors = ["Lorenz Schmidt <bytesnake@mailbox.org>"]
-edition = "2018"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+members = [
+    "enzyme",
+    "enzyme-sys",
+]

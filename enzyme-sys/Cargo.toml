@@ -8,8 +8,6 @@ edition = "2018"
 
 [dependencies]
 llvm-sys = { version = "110" }
-
-[build-dependencies]
 bindgen = "0.56"
 pkg-config = "0.3.19"
 
