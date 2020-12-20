@@ -107,7 +107,7 @@ pub unsafe fn load_llvm() {
     };
     let b = diff.create_primal_and_grad(
         fnc,
-        CDIFFE_TYPE::DFT_CONSTANT,
+        CDIFFE_TYPE::DFT_OUT_DIFF,
         vec![CDIFFE_TYPE::DFT_DUP_ARG, CDIFFE_TYPE::DFT_DUP_ARG],
         fn_type,
     );
