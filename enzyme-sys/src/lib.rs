@@ -2,11 +2,10 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-include!(concat!(env!("OUT_DIR"), "/enzyme.rs"));
-
 pub mod tree;
 pub mod typeinfo;
-
+pub mod enzyme_ffi;
+use enzyme_ffi::*;
 use llvm_sys::prelude::LLVMValueRef;
 
 pub struct AutoDiff {

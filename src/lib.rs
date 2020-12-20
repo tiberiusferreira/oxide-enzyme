@@ -1,7 +1,6 @@
 //extern crate llvm_sys;
 //
 
-mod parser;
 
 use std::ptr;
 use std::process;
