@@ -3,4 +3,15 @@
 members = [
     "enzyme",
     "enzyme-sys",
+    "enzyme-proc-macro",
+    "example",
 ]
+
+[profile.dev]
+lto="thin"
+[profile.release]
+lto="thin"
+[profile.test]
+lto="thin"
+[profile.bench]
+lto="thin"
